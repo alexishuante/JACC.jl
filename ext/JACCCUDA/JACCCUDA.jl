@@ -352,6 +352,7 @@ function reduce_kernel_cuda_MN((M, N), red, ret)
 end
 
 function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
+  println("Printing from JACC.shared")
   size = length(x)
   shmem = @cuDynamicSharedMem(T, size)
   num_threads = blockDim().x * blockDim().y
