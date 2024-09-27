@@ -20,10 +20,8 @@ function JACC.parallel_for(N::I, f::F, x...) where {I <: Integer, F <: Function}
     #parallel_kernel = cufunction(_parallel_for_cuda, parallel_tt)
     #maxPossibleThreads = CUDA.maxthreads(parallel_kernel)
     maxPossibleThreads = 512
-    #threads = min(N, maxPossibleThreads)
-    #blocks = ceil(Int, N / threads)
-    threads = 64
-    blocks = 256
+    threads = min(N, maxPossibleThreads)
+    blocks = ceil(Int, N / threads)
     println("Using parameters: <<<$(blocks),$(threads)>>>")
     shmem_size = attribute(device(),CUDA.DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
     #parallel_kernel(parallel_kargs...; threads = threads, blocks = blocks)
