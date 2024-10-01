@@ -429,20 +429,28 @@ function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
     if blockDim().y == 1
       @cuprintln("1D block configuration")
       ind = threadIdx().x
-      @cuprintln("Thread $(threadIdx().x) copying element $ind")
-      @inbounds shmem[ind] = x[ind]
+      @cuprintln("Thread $(threadIdx().x) processing index $ind")
+      if ind <= size
+        @inbounds shmem[ind] = x[ind]
+      else
+        @cuprintln("Index $ind out of bounds")
+      end
     else
       @cuprintln("2D block configuration")
       i_local = threadIdx().x
       j_local = threadIdx().y
       ind = (i_local - 1) * blockDim().x + j_local
       @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
-      if ndims(x) == 1
-        @cuprintln("Copying 1D array element")
-        @inbounds shmem[ind] = x[ind]
-      elseif ndims(x) == 2
-        @cuprintln("Copying 2D array element")
-        @inbounds shmem[ind] = x[i_local,j_local]
+      if ind <= size
+        if ndims(x) == 1
+          @cuprintln("Copying 1D array element")
+          @inbounds shmem[ind] = x[ind]
+        elseif ndims(x) == 2
+          @cuprintln("Copying 2D array element")
+          @inbounds shmem[ind] = x[i_local,j_local]
+        end
+      else
+        @cuprintln("Index $ind out of bounds")
       end
     end
   else
@@ -450,8 +458,8 @@ function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
     if blockDim().y == 1
       @cuprintln("1D block configuration with multiple iterations")
       ind = threadIdx().x
-      for i in blockDim().x:blockDim().x:size
-        @cuprintln("Thread $(threadIdx().x) copying element $ind")
+      while ind <= size
+        @cuprintln("Thread $(threadIdx().x) processing index $ind")
         @inbounds shmem[ind] = x[ind]
         ind += blockDim().x
       end
@@ -462,17 +470,18 @@ function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
       ind = (i_local - 1) * blockDim().x + j_local
       if ndims(x) == 1
         @cuprintln("Copying 1D array elements")
-        for i in num_threads:num_threads:size
-          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) copying element $ind")
+        while ind <= size
+          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
           @inbounds shmem[ind] = x[ind]
           ind += num_threads
         end
       elseif ndims(x) == 2
         @cuprintln("Copying 2D array elements")
-        for i in num_threads:num_threads:size
-          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) copying element at ($i_local, $j_local)")
+        while ind <= size
+          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
           @inbounds shmem[ind] = x[i_local,j_local]
           ind += num_threads
+          i_local += blockDim().x
         end
       end
     end
