@@ -353,89 +353,61 @@ function reduce_kernel_cuda_MN((M, N), red, ret)
     return nothing
 end
 
-# function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
-#   @cuprintln("Printing from shared")
-#   size = length(x)
-#   shmem = @cuDynamicSharedMem(T, size)
-#   num_threads = blockDim().x * blockDim().y
-#   if (size <= num_threads)
-#     if blockDim().y == 1
-#       ind = threadIdx().x
-#       #if (ind <= size)
-#         @inbounds shmem[ind] = x[ind]
-#       #end
-#     else
-#       i_local = threadIdx().x
-#       j_local = threadIdx().y
-#       ind = (i_local - 1) * blockDim().x + j_local
-#       if ndims(x) == 1
-#         #if (ind <= size)
-#           @inbounds shmem[ind] = x[ind]
-#         #end
-#       elseif ndims(x) == 2
-#         #if (ind <= size)
-#           @inbounds shmem[ind] = x[i_local,j_local]
-#         #end
-#       end
-#     end
-#   else
-#     if blockDim().y == 1
-#       ind = threadIdx().x
-#       for i in blockDim().x:blockDim().x:size
-#         @inbounds shmem[ind] = x[ind]
-#         ind += blockDim().x
-#       end
-#     else
-#       i_local = threadIdx().x
-#       j_local = threadIdx().y
-#       ind = (i_local - 1) * blockDim().x + j_local
-#       if ndims(x) == 1
-#         for i in num_threads:num_threads:size
-#           @inbounds shmem[ind] = x[ind]
-#           ind += num_threads
-#         end
-#       elseif ndims(x) == 2
-#         for i in num_threads:num_threads:size
-#           @inbounds shmem[ind] = x[i_local,j_local]
-#           ind += num_threads
-#         end
-#       end
-#     end
-#   end
-#   sync_threads()
-#   return shmem
-# end
-
-function JACC.shared(x::CuDeviceVector{T,N}) where {T,N}
-    thread_id = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    if thread_id == 1
-        @cuprintln("Entering JACC.shared function")
-        @cuprintln("Input array type: $(typeof(x))")
-        @cuprintln("Input array size: $(size(x))")
+function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
+  @cuprintln("Printing from shared")
+  size = length(x)
+  shmem = @cuDynamicSharedMem(T, size)
+  num_threads = blockDim().x * blockDim().y
+  if (size <= num_threads)
+    if blockDim().y == 1
+      ind = threadIdx().x
+      #if (ind <= size)
+        @inbounds shmem[ind] = x[ind]
+      #end
+    else
+      i_local = threadIdx().x
+      j_local = threadIdx().y
+      ind = (i_local - 1) * blockDim().x + j_local
+      if ndims(x) == 1
+        #if (ind <= size)
+          @inbounds shmem[ind] = x[ind]
+        #end
+      elseif ndims(x) == 2
+        #if (ind <= size)
+          @inbounds shmem[ind] = x[i_local,j_local]
+        #end
+      end
     end
-    
-    size_x = length(x)
-    shmem = @cuDynamicSharedMem(T, size_x)
-    num_threads = blockDim().x * blockDim().y
-    
-    if thread_id == 1
-        @cuprintln("Allocated shared memory size: $size_x")
-        @cuprintln("Number of threads: $num_threads")
+  else
+    if blockDim().y == 1
+      ind = threadIdx().x
+      for i in blockDim().x:blockDim().x:size
+        @inbounds shmem[ind] = x[ind]
+        ind += blockDim().x
+      end
+    else
+      i_local = threadIdx().x
+      j_local = threadIdx().y
+      ind = (i_local - 1) * blockDim().x + j_local
+      if ndims(x) == 1
+        for i in num_threads:num_threads:size
+          @inbounds shmem[ind] = x[ind]
+          ind += num_threads
+        end
+      elseif ndims(x) == 2
+        for i in num_threads:num_threads:size
+          @inbounds shmem[ind] = x[i_local,j_local]
+          ind += num_threads
+        end
+      end
     end
-    
-    if thread_id <= size_x
-        @cuprintln("Thread $thread_id copying data")
-        @inbounds shmem[thread_id] = x[thread_id]
-    end
-    
-    sync_threads()
-    
-    if thread_id == 1
-        @cuprintln("Exiting JACC.shared function")
-    end
-    
-    return shmem
+  end
+  sync_threads()
+  @cuprintln("returning shmem: ", shmem)
+  return shmem
 end
+
+
 
 function __init__()
     const JACC.Array = CUDA.CuArray{T, N} where {T, N}
