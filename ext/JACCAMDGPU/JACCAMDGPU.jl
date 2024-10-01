@@ -11,10 +11,12 @@ using .experimental
 
 function JACC.parallel_for(N::I, f::F, x...) where {I <: Integer, F <: Function}
     numThreads = 512
-    threads = min(N, numThreads)
-    blocks = ceil(Int, N / threads)
+    #threads = min(N, numThreads)
+    #blocks = ceil(Int, N / threads)
     # shmem_size = attribute(device(),CUDA.DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
     # We must know how to get the max shared memory to be used in AMDGPU as it is done in CUDA
+    threads = 64
+    blocks = 256
     println("Using parameters: <<<$(blocks),$(threads)>>>")
     shmem_size = 2 * threads * sizeof(Float64)
     @roc groupsize = threads gridsize = blocks shmem = shmem_size _parallel_for_amdgpu(f, x...)
