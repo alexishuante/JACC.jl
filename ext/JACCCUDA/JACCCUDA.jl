@@ -353,57 +353,132 @@ function reduce_kernel_cuda_MN((M, N), red, ret)
     return nothing
 end
 
+# function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
+#   @cuprintln("Printing from shared")
+#   size = length(x)
+#   shmem = @cuDynamicSharedMem(T, size)
+#   num_threads = blockDim().x * blockDim().y
+#   if (size <= num_threads)
+#     if blockDim().y == 1
+#       ind = threadIdx().x
+#       #if (ind <= size)
+#         @inbounds shmem[ind] = x[ind]
+#       #end
+#     else
+#       i_local = threadIdx().x
+#       j_local = threadIdx().y
+#       ind = (i_local - 1) * blockDim().x + j_local
+#       if ndims(x) == 1
+#         #if (ind <= size)
+#           @inbounds shmem[ind] = x[ind]
+#         #end
+#       elseif ndims(x) == 2
+#         #if (ind <= size)
+#           @inbounds shmem[ind] = x[i_local,j_local]
+#         #end
+#       end
+#     end
+#   else
+#     if blockDim().y == 1
+#       ind = threadIdx().x
+#       for i in blockDim().x:blockDim().x:size
+#         @inbounds shmem[ind] = x[ind]
+#         ind += blockDim().x
+#       end
+#     else
+#       i_local = threadIdx().x
+#       j_local = threadIdx().y
+#       ind = (i_local - 1) * blockDim().x + j_local
+#       if ndims(x) == 1
+#         for i in num_threads:num_threads:size
+#           @inbounds shmem[ind] = x[ind]
+#           ind += num_threads
+#         end
+#       elseif ndims(x) == 2
+#         for i in num_threads:num_threads:size
+#           @inbounds shmem[ind] = x[i_local,j_local]
+#           ind += num_threads
+#         end
+#       end
+#     end
+#   end
+#   sync_threads()
+#   @cuprintln("returning shmem: ", shmem)
+#   return shmem
+# end
+
 function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
-  @cuprintln("Printing from shared")
+  @cuprintln("Entering JACC.shared function")
+  @cuprintln("Input array type: $(typeof(x)), dimensions: $(size(x))")
+  
   size = length(x)
+  @cuprintln("Total size of input array: $size")
+  
   shmem = @cuDynamicSharedMem(T, size)
+  @cuprintln("Allocated shared memory of size $size")
+  
   num_threads = blockDim().x * blockDim().y
+  @cuprintln("Total number of threads: $num_threads")
+  @cuprintln("Block dimensions: ($(blockDim().x), $(blockDim().y))")
+  
   if (size <= num_threads)
+    @cuprintln("Case: size <= num_threads")
     if blockDim().y == 1
+      @cuprintln("1D block configuration")
       ind = threadIdx().x
-      #if (ind <= size)
-        @inbounds shmem[ind] = x[ind]
-      #end
+      @cuprintln("Thread $(threadIdx().x) copying element $ind")
+      @inbounds shmem[ind] = x[ind]
     else
+      @cuprintln("2D block configuration")
       i_local = threadIdx().x
       j_local = threadIdx().y
       ind = (i_local - 1) * blockDim().x + j_local
+      @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
       if ndims(x) == 1
-        #if (ind <= size)
-          @inbounds shmem[ind] = x[ind]
-        #end
+        @cuprintln("Copying 1D array element")
+        @inbounds shmem[ind] = x[ind]
       elseif ndims(x) == 2
-        #if (ind <= size)
-          @inbounds shmem[ind] = x[i_local,j_local]
-        #end
+        @cuprintln("Copying 2D array element")
+        @inbounds shmem[ind] = x[i_local,j_local]
       end
     end
   else
+    @cuprintln("Case: size > num_threads")
     if blockDim().y == 1
+      @cuprintln("1D block configuration with multiple iterations")
       ind = threadIdx().x
       for i in blockDim().x:blockDim().x:size
+        @cuprintln("Thread $(threadIdx().x) copying element $ind")
         @inbounds shmem[ind] = x[ind]
         ind += blockDim().x
       end
     else
+      @cuprintln("2D block configuration with multiple iterations")
       i_local = threadIdx().x
       j_local = threadIdx().y
       ind = (i_local - 1) * blockDim().x + j_local
       if ndims(x) == 1
+        @cuprintln("Copying 1D array elements")
         for i in num_threads:num_threads:size
+          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) copying element $ind")
           @inbounds shmem[ind] = x[ind]
           ind += num_threads
         end
       elseif ndims(x) == 2
+        @cuprintln("Copying 2D array elements")
         for i in num_threads:num_threads:size
+          @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) copying element at ($i_local, $j_local)")
           @inbounds shmem[ind] = x[i_local,j_local]
           ind += num_threads
         end
       end
     end
   end
+  
   sync_threads()
-  @cuprintln("returning shmem: ", shmem)
+  @cuprintln("Threads synchronized")
+  
+  @cuprintln("Returning shared memory array: $(typeof(shmem)), size: $(size(shmem))")
   return shmem
 end
 
