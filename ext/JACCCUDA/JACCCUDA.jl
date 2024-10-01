@@ -408,7 +408,6 @@ end
 # end
 
 function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
-  @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y), $(threadIdx().z)) in Block ($(blockIdx().x), $(blockIdx().y), $(blockIdx().z)) entering JACC.shared")
   
   @cuprintln("Input array type: $(typeof(x)), dimensions: $(size(x))")
   
