@@ -404,70 +404,132 @@ end
 #   return shmem
 # end
 
-function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
-    @cuprintln("Entering JACC.shared function")
-    @cuprintln("Input array type: $(typeof(x))")
-    @cuprintln("Input array size: $(size(x))")
+# function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
+#     @cuprintln("Entering JACC.shared function")
+#     @cuprintln("Input array type: $(typeof(x))")
+#     @cuprintln("Input array size: $(size(x))")
+    
+#     size = length(x)
+#     shmem = @cuDynamicSharedMem(T, size)
+#     num_threads = blockDim().x * blockDim().y
+    
+#     @cuprintln("Allocated shared memory size: $size")
+#     @cuprintln("Number of threads: $num_threads")
+    
+#     if (size <= num_threads)
+#         @cuprintln("Case: size <= num_threads")
+#         if blockDim().y == 1
+#             @cuprintln("1D block configuration")
+#             ind = threadIdx().x
+#             @cuprintln("Thread $(threadIdx().x) processing index $ind")
+#             @inbounds shmem[ind] = x[ind]
+#         else
+#             @cuprintln("2D block configuration")
+#             i_local = threadIdx().x
+#             j_local = threadIdx().y
+#             ind = (i_local - 1) * blockDim().x + j_local
+#             @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
+#             if ndims(x) == 1
+#                 @inbounds shmem[ind] = x[ind]
+#             elseif ndims(x) == 2
+#                 @inbounds shmem[ind] = x[i_local,j_local]
+#             end
+#         end
+#     else
+#         @cuprintln("Case: size > num_threads")
+#         if blockDim().y == 1
+#             @cuprintln("1D block configuration with multiple iterations")
+#             ind = threadIdx().x
+#             for i in blockDim().x:blockDim().x:size
+#                 @cuprintln("Thread $(threadIdx().x) processing index $ind")
+#                 @inbounds shmem[ind] = x[ind]
+#                 ind += blockDim().x
+#             end
+#         else
+#             @cuprintln("2D block configuration with multiple iterations")
+#             i_local = threadIdx().x
+#             j_local = threadIdx().y
+#             ind = (i_local - 1) * blockDim().x + j_local
+#             if ndims(x) == 1
+#                 for i in num_threads:num_threads:size
+#                     @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing 1D index $ind")
+#                     @inbounds shmem[ind] = x[ind]
+#                     ind += num_threads
+#                 end
+#             elseif ndims(x) == 2
+#                 for i in num_threads:num_threads:size
+#                     @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing 2D index ($i_local, $j_local)")
+#                     @inbounds shmem[ind] = x[i_local,j_local]
+#                     ind += num_threads
+#                 end
+#             end
+#         end
+#     end
+    
+#     sync_threads()
+#     @cuprintln("Exiting JACC.shared function")
+#     return shmem
+# end
+
+function JACC.shared(x::CuDeviceVector{T,N}) where {T,N}
+    thread_id = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if thread_id == 1
+        @cuprintln("Entering JACC.shared function")
+        @cuprintln("Input array type: $(typeof(x))")
+        @cuprintln("Input array size: $(size(x))")
+    end
     
     size = length(x)
     shmem = @cuDynamicSharedMem(T, size)
     num_threads = blockDim().x * blockDim().y
     
-    @cuprintln("Allocated shared memory size: $size")
-    @cuprintln("Number of threads: $num_threads")
+    if thread_id == 1
+        @cuprintln("Allocated shared memory size: $size")
+        @cuprintln("Number of threads: $num_threads")
+    end
     
     if (size <= num_threads)
-        @cuprintln("Case: size <= num_threads")
         if blockDim().y == 1
-            @cuprintln("1D block configuration")
             ind = threadIdx().x
-            @cuprintln("Thread $(threadIdx().x) processing index $ind")
-            @inbounds shmem[ind] = x[ind]
+            if ind <= size
+                @inbounds shmem[ind] = x[ind]
+            end
         else
-            @cuprintln("2D block configuration")
             i_local = threadIdx().x
             j_local = threadIdx().y
             ind = (i_local - 1) * blockDim().x + j_local
-            @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing index $ind")
-            if ndims(x) == 1
-                @inbounds shmem[ind] = x[ind]
-            elseif ndims(x) == 2
-                @inbounds shmem[ind] = x[i_local,j_local]
+            if ind <= size
+                if ndims(x) == 1
+                    @inbounds shmem[ind] = x[ind]
+                elseif ndims(x) == 2
+                    @inbounds shmem[ind] = x[i_local,j_local]
+                end
             end
         end
     else
-        @cuprintln("Case: size > num_threads")
         if blockDim().y == 1
-            @cuprintln("1D block configuration with multiple iterations")
-            ind = threadIdx().x
-            for i in blockDim().x:blockDim().x:size
-                @cuprintln("Thread $(threadIdx().x) processing index $ind")
-                @inbounds shmem[ind] = x[ind]
-                ind += blockDim().x
+            for i in threadIdx().x:blockDim().x:size
+                @inbounds shmem[i] = x[i]
             end
         else
-            @cuprintln("2D block configuration with multiple iterations")
             i_local = threadIdx().x
             j_local = threadIdx().y
-            ind = (i_local - 1) * blockDim().x + j_local
-            if ndims(x) == 1
-                for i in num_threads:num_threads:size
-                    @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing 1D index $ind")
-                    @inbounds shmem[ind] = x[ind]
-                    ind += num_threads
-                end
-            elseif ndims(x) == 2
-                for i in num_threads:num_threads:size
-                    @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y)) processing 2D index ($i_local, $j_local)")
-                    @inbounds shmem[ind] = x[i_local,j_local]
-                    ind += num_threads
+            for i in (threadIdx().x + (blockIdx().x - 1) * blockDim().x):num_threads:size
+                if i <= size
+                    if ndims(x) == 1
+                        @inbounds shmem[i] = x[i]
+                    elseif ndims(x) == 2
+                        @inbounds shmem[i] = x[i_local,j_local]
+                    end
                 end
             end
         end
     end
     
     sync_threads()
-    @cuprintln("Exiting JACC.shared function")
+    if thread_id == 1
+        @cuprintln("Exiting JACC.shared function")
+    end
     return shmem
 end
 
