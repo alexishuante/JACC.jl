@@ -408,19 +408,22 @@ end
 # end
 
 function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
-  @cuprintln("Entering JACC.shared function")
+  @cuprintln("Thread ($(threadIdx().x), $(threadIdx().y), $(threadIdx().z)) in Block ($(blockIdx().x), $(blockIdx().y), $(blockIdx().z)) entering JACC.shared")
+  
   @cuprintln("Input array type: $(typeof(x)), dimensions: $(size(x))")
   
   size = length(x)
   @cuprintln("Total size of input array: $size")
   
+  @cuprintln("Allocating shared memory")
   shmem = @cuDynamicSharedMem(T, size)
-  @cuprintln("Allocated shared memory of size $size")
+  @cuprintln("Shared memory allocated")
   
   num_threads = blockDim().x * blockDim().y
   @cuprintln("Total number of threads: $num_threads")
   @cuprintln("Block dimensions: ($(blockDim().x), $(blockDim().y))")
   
+  @cuprintln("Entering main logic")
   if (size <= num_threads)
     @cuprintln("Case: size <= num_threads")
     if blockDim().y == 1
@@ -474,6 +477,8 @@ function JACC.shared(x::CuDeviceArray{T,N}) where {T,N}
       end
     end
   end
+  
+  @cuprintln("Main logic completed")
   
   sync_threads()
   @cuprintln("Threads synchronized")
