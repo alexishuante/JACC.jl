@@ -16,7 +16,7 @@ function JACC.parallel_for(N::I, f::F, x...) where {I <: Integer, F <: Function}
     #groups = ceil(Int, N / items)
     items = 128
     groups = 256
-    println("Using parameters: <<<$(items),$(groups)>>>")
+    println("Using parameters: <<<$(groups),$(items)>>>")
     # shmem_size = attribute(device(),CUDA.DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
     # We must know how to get the max shared memory to be used in oneAPI as it is done in CUDA
     #shmem_size = 2 * threads * sizeof(Float64)
