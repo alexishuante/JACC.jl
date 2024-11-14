@@ -39,7 +39,7 @@ function JACC.parallel_for(
 end
 
 function JACC.parallel_for(
-        ::oneAPIBackend, (L, M, N)::Tuple{I, I}, f::F, x...) where {
+        ::oneAPIBackend, (L, M, N)::Tuple{I, I, I}, f::F, x...) where {
         I <: Integer, F <: Function}
     maxPossibleItems = 16
     Litems = min(M, maxPossibleItems)
