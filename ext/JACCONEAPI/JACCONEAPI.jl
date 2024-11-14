@@ -15,12 +15,15 @@ function JACC.parallel_for(
         ::oneAPIBackend, N::I, f::F, x...) where {I <: Integer, F <: Function}
     #maxPossibleItems = oneAPI.oneL0.compute_properties(device().maxTotalGroupSize)
     maxPossibleItems = 256
-    items = min(N, maxPossibleItems)
-    groups = ceil(Int, N / items)
+    #items = min(N, maxPossibleItems)
+    #groups = ceil(Int, N / items)
     # shmem_size = attribute(device(),CUDA.DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
     # We must know how to get the max shared memory to be used in oneAPI as it is done in CUDA
     #shmem_size = 2 * threads * sizeof(Float64)
     #oneAPI.@sync @oneapi items = items groups = groups shmem = shmem_size _parallel_for_oneapi(f, x...)
+    items = 128
+    groups = 256
+    println("Using kernel parameters: <<<$(groups),$(items)>>>")
     oneAPI.@sync @oneapi items=items groups=groups _parallel_for_oneapi(
         N, f, x...)
 end
