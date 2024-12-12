@@ -25,8 +25,8 @@ function JACC.parallel_for(
     # We must know how to get the max shared memory to be used in AMDGPU as it is done in CUDA
     #threads = 128
     #blocks = 256
-    blocks = 512
-    threads = 256
+    blocks = 256
+    threads = 128
     println("Using kernel parameters: <<<$(blocks),$(threads)>>>")
     shmem_size = 2 * threads * sizeof(Float64)
     @roc groupsize=threads gridsize=blocks shmem=shmem_size _parallel_for_amdgpu(
